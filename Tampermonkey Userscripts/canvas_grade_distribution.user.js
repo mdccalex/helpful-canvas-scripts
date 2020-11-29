@@ -10,17 +10,7 @@
 // @run-at       document-idle
 // ==/UserScript==
 
-/*
-==INSTRUCTIONS==
-
-1. Go to a gradebook page for a course in Canvas
-2. Scroll the page down to where the added "Check Grade Distribution" button is.
-3. Scroll the gradebook table horizontally until the 'Total' column is visible.
-4. Click the button
-5. At a reasonable pace, scroll the gradebook table vertically until you have passed all of the grades. 
-6. Once complete (progress is shown as the text of the button), a basic javascript popup appears showing the count of grades,
-   and the button is hidden from view until the page is reloaded. 
-*/
+// Documentation available at https://github.com/mdccalex/helpful-canvas-scripts/wiki/canvas_grade_distribution.user.js
 
 function getNextURL(linkTxt) {
   var url = null;
@@ -52,13 +42,12 @@ function getPaginatedRequest(url) {
                console.log(resultData);
                results = results.concat(resultData);
                nextUrl = getNextURL(jqXHR.getResponseHeader('link'));
-               //console.log("Next URL: " + nextUrl);
            },
            error: function(jqXHR, textStatus, errorThrown) {
                console.log("Error occurred:" + errorThrown);
                console.log(jqXHR);
            },
-           timeout: 60000,
+           timeout: 30000,
            });
     };
     return results;
@@ -90,12 +79,11 @@ function startGradeDistribution() {
     //Get the instructure sub-domain and the course ID
     const hostname = window.location.hostname;
     const course_id = window.location.pathname.split("/",3)[2];
-
+    
+    //Get the list of active students in the course
     var url = `https://${hostname}/api/v1/courses/${course_id}/users?enrollment_type[]=student&per_page=50`;
     var students = getPaginatedRequest(url);
-    //console.log(students);
     var student_ids = stripJSONToList(students, 'id');
-    //console.log(student_ids);
     var total_student_ids = student_ids.length;
 
     $("#grade_distribution_tampermonkey").text(`0/${total_student_ids}`);
@@ -109,7 +97,6 @@ function startGradeDistribution() {
         setTimeout(function () {
             console.log("Running grade check, length of student_ids is " + student_ids.length.toString());
             $("div.canvas_1 > div.slick-row").each(function (i, e) {
-                console.log("Checking an element");
                 for (var j = 0; j < e.classList.length; j++) {
                     if (!e.classList[j]) {
                         continue;
@@ -139,13 +126,12 @@ function startGradeDistribution() {
                 harvestGradesLoop();
             } else {
                 console.log("All grades found!");
-                //$("#grade_distribution_tampermonkey").hide();
                 document.getElementById("grade_distribution_tampermonkey").style.display = 'none';
 
                 var alert_text = `Grade distribution check complete!\n\nA - ${grade_distribution['A']}\nB - ${grade_distribution['B']}\nC - ${grade_distribution['C']}\nD - ${grade_distribution['D']}\nE - ${grade_distribution['E']}`;
 
-
                 alert(alert_text);
+               
                 console.log(student_grade_map);
                 console.log(grade_distribution);
             };
