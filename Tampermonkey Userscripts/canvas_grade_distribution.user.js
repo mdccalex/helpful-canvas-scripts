@@ -10,6 +10,18 @@
 // @run-at       document-idle
 // ==/UserScript==
 
+/*
+==INSTRUCTIONS==
+
+1. Go to a gradebook page for a course in Canvas
+2. Scroll the page down to where the added "Check Grade Distribution" button is.
+3. Scroll the gradebook table horizontally until the 'Total' column is visible.
+4. Click the button
+5. At a reasonable pace, scroll the gradebook table vertically until you have passed all of the grades. 
+6. Once complete (progress is shown as the text of the button), a basic javascript popup appears showing the count of grades,
+   and the button is hidden from view until the page is reloaded. 
+*/
+
 function getNextURL(linkTxt) {
   var url = null;
   if (linkTxt) {
