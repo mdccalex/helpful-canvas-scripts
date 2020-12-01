@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Canvas Gradebook - Grade Distribution
 // @namespace    https://github.com/mdccalex
-// @version      0.1
+// @version      0.2
 // @description  Retrieve a grade distribution for a course in Canvas.
 // @author       mdccalex
 // @match        https://*.instructure.com/courses/*/gradebook
