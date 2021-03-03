@@ -3,7 +3,7 @@
 // @namespace	https://github.com/mdccalex
 // @version     0.1
 // @description Copy rubrics between courses and accounts
-// @author		mdccalex
+// @author	mdccalex
 // @include     https://*.instructure.com/courses/*/rubrics
 // @include     https://*.instructure.com/accounts/*/rubrics
 // @grant       none
