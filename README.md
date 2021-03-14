@@ -9,5 +9,5 @@ Tampermonkey allows for the installation and management of "Userscripts", which 
 Once you have installed Tampermonkey, click on any of the following links to install one of the Userscripts in this repository. 
 
 # Available userscripts
-* [canvas_rubric_copy](https://github.com/mdccalex/helpful-canvas-scripts/raw/main/Tampermonkey%20Userscripts/canvas_rubric_copy.user.js) - Allows you to copy/duplicate rubrics between courses and accounts you are enrolled in. 
+* [canvas_rubric_copy](https://github.com/mdccalex/helpful-canvas-scripts/raw/main/Tampermonkey%20Userscripts/canvas_rubric_copy.user.js) - Allows you to copy/duplicate rubrics between courses and accounts, with ability to select between courses/accounts by enrollment, sub-account admin, or root account admin.
 * [canvas_grade_distribution](https://github.com/mdccalex/helpful-canvas-scripts/raw/main/Tampermonkey%20Userscripts/canvas_grade_distribution.user.js) - A dumb way of getting a grade distribution from gradebook that isn't fully automated. Lacks universality. 
