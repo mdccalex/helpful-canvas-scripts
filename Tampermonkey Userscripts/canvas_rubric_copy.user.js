@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name        Canvas - Rubrics Copy Tool
 // @namespace	https://github.com/mdccalex
-// @version     0.1
+// @version     0.2
 // @description Copy rubrics between courses and accounts
-// @author	mdccalex
+// @author		mdccalex
 // @include     https://*.instructure.com/courses/*/rubrics
 // @include     https://*.instructure.com/accounts/*/rubrics
 // @grant       none
@@ -80,25 +80,25 @@
     }
 
     function getRequest(url) {
-     //Make a request for a single object
+        //Make a request for a single object
         console.log("Making a single GET request to " + url);
         var result = "";
         $.ajax({
-                url: url,
-                type: "GET",
-                async: false,
-                contentType: 'application/json; charset=utf-8',
-                dataType: 'JSON',
-                success: function(resultData, textStatus, jqXHR) {
-                    // console.log(resultData);
-                    result = resultData;
-                },
-                error: function(jqXHR, textStatus, errorThrown) {
-                    console.log("Error occurred:" + errorThrown);
-                    console.log(jqXHR);
-                },
-                timeout: 5000,
-            });
+            url: url,
+            type: "GET",
+            async: false,
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'JSON',
+            success: function(resultData, textStatus, jqXHR) {
+                // console.log(resultData);
+                result = resultData;
+            },
+            error: function(jqXHR, textStatus, errorThrown) {
+                console.log("Error occurred:" + errorThrown);
+                console.log(jqXHR);
+            },
+            timeout: 5000,
+        });
         return result;
     }
 
@@ -129,7 +129,7 @@
             el.classList.add('ic-Form-control');
 
             //Add the dialog layout
-            el.innerHTML = "<table width='100%'><tr><td id='copy-rubric-left' width='50%'><h4>Select rubrics</h4></td><td id='copy-rubric-right' width='50%'><h4>Select destination</h4></td></tr><tr style='vertical-align:top;'><td><div id='cb-Container'></div></td><td><input type='radio' id='copy_rubric_dest_account' name='copy_rubric_dest_type' value='account'><label for='copy_rubric_dest_account'>Account</label><br /><input type='radio' id='copy_rubric_dest_course' name='copy_rubric_dest_type' value='course'><label for='copy_rubric_dest_course'>Course</label><br /><hr /><select id='copy_rubric_select_dest' class='ic-Input'></select></td></tr></table>";
+            el.innerHTML = "<table width='100%'><tr><td id='copy-rubric-left' width='50%'><h4>Select rubrics</h4></td><td id='copy-rubric-right' width='50%'><h4>Select destination by <select name='dest_select_by' id='dest_select_by'><option value='enrollment'>Enrollment</option><option value='subaccount'>Sub-Account</option><option value='rootaccount'>Root Account</option></select></h4></td></tr><tr style='vertical-align:top;'><td><div id='cb-Container'></div></td><td><div id='subaccount_select_box' style='display:none;'><label for='subaccount_select'>From Sub-Account: </label><select name='subaccount_select' id='subaccount_select'></select><br /></div><input type='radio' id='copy_rubric_dest_account' name='copy_rubric_dest_type' value='account'><label for='copy_rubric_dest_account'>Account</label><br /><input type='radio' id='copy_rubric_dest_course' name='copy_rubric_dest_type' value='course'><label for='copy_rubric_dest_course'>Course</label><br /><hr /><select id='copy_rubric_select_dest' class='ic-Input'></select></td></tr></table>";
 
             var msg = document.createElement('div');
             msg.id = 'kk_rubric_msg';
@@ -148,7 +148,6 @@
                 var rubric_id = $(this).attr("href").split("rubrics/");
                 rubric_id = rubric_id[rubric_id.length-1];
                 var rubric_title = $(this).text();
-                // console.log("Found " + rubric_title + " (" + rubric_id + ")");
                 var cb_html = "<input type='checkbox' id='cb_" + rubric_id + "' name='cb_" + rubric_id + "' value='" + rubric_id + "' class='copy_rubric_cb'>";
                 cb_html += "<label for='cb_" + rubric_id + "'>" + rubric_title + "</label><br />";
                 $('#cb-Container').append(cb_html);
@@ -159,39 +158,90 @@
                 $('.copy_rubric_cb:checkbox').not(this).prop('checked', this.checked);
             });
 
+            // Update on dest_select_by change
+            // Specifically: Show/hide the Sub-Account selector as necessary, and unselect the radio buttons for course/account.
+            $("#dest_select_by").change(function () {
+                var selected = $(this).val();
+                console.log(selected);
+
+                $("input:radio[name=copy_rubric_dest_type]").prop("checked", false);
+                $("#copy_rubric_select_dest").empty(); // Empty the select input
+                $("#subaccount_select").empty(); // Empty the sub account select input
+
+                if (selected === "subaccount") {
+                    // Display the subaccount selection box and populate it
+                    $("#subaccount_select_box").css("display", "inline");
+
+                    var accounts_url = `https://${hostname}/api/v1/accounts?per_page=50`;
+                    populateDestinationSelection(accounts_url, "account", "#subaccount_select")
+                } else {
+                    $("#subaccount_select_box").css("display", "none");
+                };
+            });
+
+            // Update the accounts or courses list if selecting by subaccount
+            $("#subaccount_select").change(function () {
+                $("#copy_rubric_select_dest").empty();
+                var dest_type = $("input:radio[name=copy_rubric_dest_type]:checked").val();
+                var subaccount_selected = $(this).val();
+                var url = null;
+
+                if (dest_type === "account") {
+                    url = `https://${hostname}/api/v1/accounts/${subaccount_selected}/sub_accounts`;
+                } else if (dest_type === "course") {
+                    url = `https://${hostname}/api/v1/accounts/${subaccount_selected}/courses?sort=sis_course_id&order=asc`;
+                };
+                populateDestinationSelection(url, dest_type);
+            });
+
             // Update destination select list on dest type change
+            // Make sure that selections of account/course are dependent on dest_select_by an d
             $("input:radio[name=copy_rubric_dest_type]").change(function () {
                 var dest_select_input = $("#copy_rubric_select_dest");
                 dest_select_input.empty(); //Empty the select input
+                var dest_select_by_input = $("#dest_select_by").val();
                 if ($(this).val() === "account") {
-                    var accounts_url = `https://${hostname}/api/v1/accounts?per_page=50`;
-                    var accounts_json = getPaginatedRequest(accounts_url);
-                    // console.log(accounts_json);
-                    for (var i = 0; i < accounts_json.length; i++) {
-                        var acc = accounts_json[i];
-                        var acc_id = acc['id']; // Preference 'sis_account_id' over 'id' if available
-                        if ('sis_account_id' in acc && acc['sis_account_id'] !== "" && acc['sis_account_id'] !== null) {
-                            acc_id = acc['sis_account_id'];
-                        }
-                        dest_select_input.append("<option value='" + acc['id'] + "'>" + acc_id + " - " + acc['name'] + "</option>");
+                    var accounts_url = null;
+                    if (dest_select_by_input === "enrollment") {
+                        accounts_url = `https://${hostname}/api/v1/accounts?per_page=50`;
+                    } else if (dest_select_by_input === "subaccount") {
+                        var subaccount_selected = $("#subaccount_select").val();
+                        accounts_url = `https://${hostname}/api/v1/accounts/${subaccount_selected}/sub_accounts`;
+                    } else if (dest_select_by_input === "rootaccount") {
+                        accounts_url = `https://${hostname}/api/v1/accounts/1/sub_accounts?per_page=50`;
                     };
-
+                    populateDestinationSelection(accounts_url, $(this).val());
                 } else if ($(this).val() === "course") {
                     // Probably need an option here to select all courses in an account or accounts
-                    var courses_url = `https://${hostname}/api/v1/courses?per_page=50`;
-                    var courses_json = getPaginatedRequest(courses_url);
-                    // console.log(courses_json);
-                    for (var i = 0; i < courses_json.length; i++) {
-                        var course = courses_json[i];
-                        var course_id = course['id']; // Preference 'sis_course_id' over 'id' if available
-                        if ('sis_course_id' in course && course['sis_course_id'] !== "" && course['sis_course_id'] !== null) {
-                            course_id = course['sis_course_id'];
-                        }
-                        dest_select_input.append("<option value='" + course['id'] + "'>" + course_id + " - " + course['name'] + "</option>");
+                    var courses_url = null;
+                    if (dest_select_by_input === "enrollment") {
+                        courses_url = `https://${hostname}/api/v1/courses?per_page=50`;
+                    } else if (dest_select_by_input === "subaccount") {
+                        var subaccount_selected = $("#subaccount_select").val();
+                        courses_url = `https://${hostname}/api/v1/accounts/${subaccount_selected}/courses?per_page=50&sort=sis_course_id&order=asc`;
+                    } else if (dest_select_by_input === "rootaccount") {
+                        courses_url = `https://${hostname}/api/v1/accounts/1/courses?per_page=50&sort=sis_course_id&order=asc`;
                     };
+                    populateDestinationSelection(courses_url, $(this).val());
                 };
             });
         }
+    }
+
+    function populateDestinationSelection(url, dest_type, select_obj_identifier="#copy_rubric_select_dest") {
+        // Populate the destination selection input by parsing the JSON resulting from the URL, and the destination type.
+        var select_obj = $(select_obj_identifier);
+        var json_res = getPaginatedRequest(url);
+
+        for (var i = 0; i < json_res.length; i++) {
+            var cur = json_res[i];
+            var cur_id = cur['id']; // Preference 'sis_course_id' over 'id' if available
+            var sis_keyword = `sis_${dest_type}_id`;
+            if (sis_keyword in cur && cur[sis_keyword] !== "" && cur[sis_keyword] !== null) {
+                cur_id = cur[sis_keyword];
+            }
+            select_obj.append("<option value='" + cur['id'] + "'>" + cur_id + " - " + cur['name'] + "</option>");
+        };
     }
 
     function openDialog() {
@@ -242,7 +292,7 @@
     }
 
     function copyRubrics() {
-     // Initiate the copy of rubrics
+        // Initiate the copy of rubrics
         //Step 1: Get all rubric IDs selected, and the target course/account ID
         var rubric_ids = getCheckboxValues();
         var context_type = $("input:radio[name=copy_rubric_dest_type]:checked").val();
@@ -309,13 +359,18 @@
                 'data' : data,
             }).done(function() {
                 updateMsgs();
-                $('#kk_rubric_dialog').dialog('close');
-                window.location.reload(true);
+                //$('#kk_rubric_dialog').dialog('close');
+                //window.location.reload(true);
             }).fail(function() {
                 console.log(data);
                 errors.push(`Failed to replicate ${cur_rubric_link} to ${new_rubric_link} \nSee browser console for debug info.`);
                 updateMsgs();
             });
+        };
+        //Close dialog if no errors
+        if (errors.length === 0) {
+            $('#kk_rubric_dialog').dialog('close');
+            window.location.reload(true);
         };
     }
 
