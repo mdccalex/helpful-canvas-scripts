@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Canvas - Rubrics Copy Tool
 // @namespace	https://github.com/mdccalex
-// @version     0.2
+// @version     0.3
 // @description Copy rubrics between courses and accounts
 // @author		mdccalex
 // @include     https://*.instructure.com/courses/*/rubrics
@@ -16,12 +16,13 @@
     var assocRegex = new RegExp('^/(course|account)s/([0-9]+)/rubrics$');
     var errors = [];
 
-    if (assocRegex.test(window.location.pathname)) {
-        add_button();
-    }
-
     const hostname = window.location.hostname;
     const pathname = window.location.pathname;
+
+    if (assocRegex.test(pathname)) {
+        add_button();
+        add_duplication_links();
+    }
 
     function getCsrfToken() {
         var csrfRegex = new RegExp('^_csrf_token=(.*)$');
@@ -39,6 +40,7 @@
     }
 
     function getNextURL(linkTxt) {
+        // Get the next URL for pagination handling
         var url = null;
         if (linkTxt) {
             var links = linkTxt.split(',');
@@ -47,17 +49,17 @@
                 var matches = nextRegEx.exec(links[i]);
                 if (matches) {
                     url = matches[1];
-                }
-            }
-        }
+                };
+            };
+        };
         return url;
     }
 
     function getPaginatedRequest(url) {
+        // Handle paginated requests for information
         let results = [];
         let nextUrl = url;
         while (nextUrl !== null) {
-            // console.log("Next URL (out of ajax): " + nextUrl);
             $.ajax({
                 url: nextUrl,
                 type: "GET",
@@ -65,7 +67,6 @@
                 contentType: 'application/json; charset=utf-8',
                 dataType: 'JSON',
                 success: function(resultData, textStatus, jqXHR) {
-                    //console.log(resultData);
                     results = results.concat(resultData);
                     nextUrl = getNextURL(jqXHR.getResponseHeader('link'));
                 },
@@ -73,7 +74,7 @@
                     console.log("Error occurred:" + errorThrown);
                     console.log(jqXHR);
                 },
-                timeout: 30000,
+                timeout: 5000,
             });
         };
         return results;
@@ -90,7 +91,6 @@
             contentType: 'application/json; charset=utf-8',
             dataType: 'JSON',
             success: function(resultData, textStatus, jqXHR) {
-                // console.log(resultData);
                 result = resultData;
             },
             error: function(jqXHR, textStatus, errorThrown) {
@@ -119,6 +119,38 @@
                 parent.appendChild(el);
             }
         }
+    }
+
+    function add_duplication_links() {
+     // Add a duplication link to each rubric on the page
+        $("div#rubrics.raw_listing > ul > li").each(function () {
+            var cur_rubric_name = $(this).children("a").text();
+            var cur_rubric = $(this).children("a").prop('href');
+            var path_split = cur_rubric.split("/");
+            var context_type = path_split[3].slice(0, -1);
+            var context_id = path_split[4];
+            var cur_id = path_split[6];
+
+            $(this).children("span.links").prepend(`<a href='#' id='duplicate_rubric_${cur_id}' class='hide-till-hover' title='Duplicate Rubric: ${cur_rubric_name}' aria-label='Duplicate Rubric: ${cur_rubric_name}'><i class='icon-copy standalone-icon'></i></a>`);
+            $(`a#duplicate_rubric_${cur_id}`).click(function () {
+             // Do the duplication
+                //Confirm the action first
+                if (confirm(`Duplicate rubric: ${cur_rubric_name}?`)) {
+                    var data = retrieve_and_restructure_rubric(cur_id, context_type, context_id);
+                    var new_rubric_link = `https://${hostname}/${context_type}s/${context_id}/rubrics`;
+                    $.ajax({
+                        'cache' : false,
+                        'url' : new_rubric_link,
+                        'type' : 'POST',
+                        'data' : data,
+                    }).done(function() {
+                        window.location.reload(true);
+                    }).fail(function() {
+                        console.log(`Failed to duplicate rubric ${cur_rubric_name} with id ${cur_id}`);
+                    });
+                };
+            })
+        });
     }
 
     function createDialog() {
@@ -195,7 +227,7 @@
             });
 
             // Update destination select list on dest type change
-            // Make sure that selections of account/course are dependent on dest_select_by an d
+            // Make sure that selections of account/course are dependent on dest_select_by
             $("input:radio[name=copy_rubric_dest_type]").change(function () {
                 var dest_select_input = $("#copy_rubric_select_dest");
                 dest_select_input.empty(); //Empty the select input
@@ -212,7 +244,6 @@
                     };
                     populateDestinationSelection(accounts_url, $(this).val());
                 } else if ($(this).val() === "course") {
-                    // Probably need an option here to select all courses in an account or accounts
                     var courses_url = null;
                     if (dest_select_by_input === "enrollment") {
                         courses_url = `https://${hostname}/api/v1/courses?per_page=50`;
@@ -267,7 +298,7 @@
                 } ],
                 'modal' : true,
                 'height' : 'auto',
-                'width' : '80%'
+                'width' : '70%'
             });
             if (!$('#kk_rubric_dialog').dialog('isOpen')) {
                 $('#kk_rubric_dialog').dialog('open');
@@ -304,50 +335,8 @@
         //Step 2: For each rubric, get the rubric
         for (var i = 0; i < rubric_ids.length; i++) {
             var cur_id = rubric_ids[i];
-            var cur_rubric_link = `https://${hostname}/api/v1${pathname}/${cur_id}`;
-            // console.log(cur_rubric_link);
-            var rubric_json = getRequest(cur_rubric_link);
-            // console.log("Data received from getRequest: " + rubric_json);
-
             //Step 3: Structure the rubric for POST
-            var data = {};
-            data['rubric[title]'] = rubric_json['title'];
-            data['rubric[points_possible]'] = rubric_json['points_possible'];
-            data['rubric_association[use_for_grading]'] = false;
-            data['rubric_association[hide_score_total]'] = rubric_json['hide_score_total'];
-            data['rubric_association[hide_points]'] = false;
-            data['rubric_association[hide_outcome_results]'] = false;
-            data['rubric[free_form_criterion_comments]'] = rubric_json['free_form_criterion_comments'];
-            data['rubric_association[id]'] = null;
-            data['rubric_association_id'] = null;
-            //Criteria here
-            for (var n = 0; n < rubric_json['data'].length; n++) {
-                var cur_crit_prefix = `rubric[criteria][${n}]`;
-                var cur_criterion = rubric_json['data'][n];
-                data[cur_crit_prefix + "[description]"] = cur_criterion['description'];
-                data[cur_crit_prefix + "[points]"] = cur_criterion['points'];
-                data[cur_crit_prefix + "[learning_outcome_id]"] = null;
-                data[cur_crit_prefix + "[long_description]"] = cur_criterion['long_description'];
-                data[cur_crit_prefix + "[id]"] = null;
-                data[cur_crit_prefix + "[criterion_use_range]"] = cur_criterion['criterion_use_range'];
-                for (var k = 0; k < cur_criterion['ratings'].length; k++) {
-                    var cur_rating_prefix = `${cur_crit_prefix}[ratings][${k}]`;
-                    var cur_rating = cur_criterion['ratings'][k];
-                    data[cur_rating_prefix + "[description]"] = cur_rating['description'];
-                    data[cur_rating_prefix + "[long_description]"] = cur_rating['long_description'];
-                    data[cur_rating_prefix + "[points]"] = cur_rating['points'];
-                    data[cur_rating_prefix + "[id]"] = 'blank';
-                };
-            };
-            //End criteria
-            data['title'] = rubric_json['title'];
-            data['points_possible'] = rubric_json['points_possible'];
-            data['rubric_id'] = 'new';
-            data['rubric_association[association_type]'] = capitaliseFirstLetter(context_type);
-            data['rubric_association[association_id]'] = context_id;
-            data['rubric_association[purpose]'] = "bookmark";
-            data['skip_updating_points_possible'] = false;
-            data.authenticity_token = getCsrfToken();
+            var data = retrieve_and_restructure_rubric(cur_id, context_type, context_id);
 
             //Step 4: Then POST the rubric to new destination
             var new_rubric_link = `https://${hostname}/${context_type}s/${context_id}/rubrics`;
@@ -372,6 +361,52 @@
             $('#kk_rubric_dialog').dialog('close');
             window.location.reload(true);
         };
+    }
+
+    function retrieve_and_restructure_rubric(rubric_id, context_type, context_id) {
+        var cur_rubric_link = `https://${hostname}/api/v1${pathname}/${rubric_id}`;
+        var rubric_json = getRequest(cur_rubric_link);
+
+        var data = {};
+        data['rubric[title]'] = rubric_json['title'];
+        data['rubric[points_possible]'] = rubric_json['points_possible'];
+        data['rubric_association[use_for_grading]'] = false;
+        data['rubric_association[hide_score_total]'] = rubric_json['hide_score_total'];
+        data['rubric_association[hide_points]'] = false;
+        data['rubric_association[hide_outcome_results]'] = false;
+        data['rubric[free_form_criterion_comments]'] = rubric_json['free_form_criterion_comments'];
+        data['rubric_association[id]'] = null;
+        data['rubric_association_id'] = null;
+        //Criteria here
+        for (var n = 0; n < rubric_json['data'].length; n++) {
+            var cur_crit_prefix = `rubric[criteria][${n}]`;
+            var cur_criterion = rubric_json['data'][n];
+            data[cur_crit_prefix + "[description]"] = cur_criterion['description'];
+            data[cur_crit_prefix + "[points]"] = cur_criterion['points'];
+            data[cur_crit_prefix + "[learning_outcome_id]"] = null;
+            data[cur_crit_prefix + "[long_description]"] = cur_criterion['long_description'];
+            data[cur_crit_prefix + "[id]"] = null;
+            data[cur_crit_prefix + "[criterion_use_range]"] = cur_criterion['criterion_use_range'];
+            for (var k = 0; k < cur_criterion['ratings'].length; k++) {
+                var cur_rating_prefix = `${cur_crit_prefix}[ratings][${k}]`;
+                var cur_rating = cur_criterion['ratings'][k];
+                data[cur_rating_prefix + "[description]"] = cur_rating['description'];
+                data[cur_rating_prefix + "[long_description]"] = cur_rating['long_description'];
+                data[cur_rating_prefix + "[points]"] = cur_rating['points'];
+                data[cur_rating_prefix + "[id]"] = 'blank';
+            };
+        };
+        //End criteria
+        data['title'] = rubric_json['title'];
+        data['points_possible'] = rubric_json['points_possible'];
+        data['rubric_id'] = 'new';
+        data['rubric_association[association_type]'] = capitaliseFirstLetter(context_type);
+        data['rubric_association[association_id]'] = context_id;
+        data['rubric_association[purpose]'] = "bookmark";
+        data['skip_updating_points_possible'] = false;
+        data.authenticity_token = getCsrfToken();
+
+        return data;
     }
 
     function updateMsgs() {
