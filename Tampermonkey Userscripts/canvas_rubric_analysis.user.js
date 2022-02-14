@@ -24,7 +24,7 @@ The logic is as follows:
     3.1 Create dictionary of rubric IDs
     3.2 Get all assignments in the course
     3.3 For each assignment, iterate counts of rubric IDs found
-    3.4 (optional) For each assignment, count the submissions applicable to each rubric
+    3.4 (optional) For each assignment, count the submissions applicable to each rubric [NOT DONE]
     3.5 Display numbers with each rubric
 */
 
@@ -132,11 +132,6 @@ The logic is as follows:
 
     function clearOutput() {
         // Clear output from previous run
-
-        /*var el_to_remove = document.querySelectorAll(".ll_rubric_text");
-        Array.from(el_to_remove).forEach((el, index) => {
-            el
-        });*/
         $(".ll_rubric_text").remove();
         console.log("Old output removed.");
     }
