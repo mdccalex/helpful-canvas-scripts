@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Canvas - Rubric Analysis
 // @namespace	https://github.com/mdccalex
-// @version      0.1
+// @version      0.2
 // @description  Analyse distribution of rubric criteria in marked student submissions
 // @author       mdccalex
 // @include     https://*.instructure.com/courses/*/rubrics
@@ -221,9 +221,11 @@ The logic is as follows:
 
         // Show the counts on the rubric page
         for (const [rating_id, count] of Object.entries(ratings)) {
-            var cur_rating = document.querySelector(`td#rating_${rating_id} > div.container > div.rating-main`);
+            var cur_rating = Array.from(document.querySelectorAll(`td.rating > div.container > div.rating-main > span.rating_id`)).find(el => el.textContent === rating_id);
             if (cur_rating) {
-                cur_rating.innerHTML += `<span class="ll_rubric_text" style="color: red">${count} Students</span>`;
+                cur_rating.parentNode.innerHTML += `<span class="ll_rubric_text" style="color: red">${count} Students</span>`;
+            } else {
+                console.log(`Couldn't locate the rating container for rating_id '${rating_id}' with count ${count}.`);
             };
         };
 
