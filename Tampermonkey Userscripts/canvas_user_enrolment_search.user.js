@@ -38,10 +38,7 @@
 
         var active_only = $("input#active_search").is(":checked");
         var current_year_only = $("input#year_search").is(":checked");
-
         var text_search = $("input#text_search").val().toLowerCase();
-        console.log(text_search);
-
         var show_count = 0;
 
         $("div.courses > ul > li").each(function () {
@@ -50,9 +47,9 @@
                 subtitles = $(this).text().toLowerCase();
             });
 
-            // console.log("subtitles" + subtitles);
+            var year = new Date().getFullYear().toString();
             var is_active = (subtitles.indexOf("active") !== -1);
-            var is_current_year = (subtitles.indexOf("2024") !== -1);
+            var is_current_year = (subtitles.indexOf(year) !== -1);
             var matches_text = (subtitles.indexOf(text_search) !== -1);
 
             if ((!is_active && active_only) || (!is_current_year && current_year_only) || (!(matches_text))) {
